@@ -52,7 +52,11 @@ impl State {
                     limits: if cfg!(target_arch = "wasm32") {
                         wgpu::Limits::downlevel_webgl2_defaults()
                     } else {
-                        wgpu::Limits::default()
+                        // Use to downlevel defaults because lower limits
+                        // initially are better the compute example uses this,
+                        // and I probably want to use compute shaders eventually.
+                        wgpu::Limits::downlevel_defaults()
+                        //wgpu::Limits::downlevel_webgl2_defaults()
                     },
                     label: None,
                 },
