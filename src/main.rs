@@ -1,3 +1,5 @@
+use cloth_simulation::run;
+
 fn main() {
-    println!("Hello, world!");
+    run();
 }
