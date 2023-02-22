@@ -1,5 +1,5 @@
 use cloth_simulation::run;
 
 fn main() {
-    run();
+    pollster::block_on(run());
 }
