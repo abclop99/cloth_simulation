@@ -123,10 +123,19 @@ impl State {
             .unwrap();
 
         let surface_caps = surface.get_capabilities(&adapter);
-        // Shader code in this tutorial assumes an sRGB surface texture. Using a different
-        // one will result all the colors coming out darker. If you want to support non
-        // sRGB surfaces, you'll need to account for that when drawing to the frame.
-        let surface_format = surface_caps.formats[0];
+
+        // Prefer Bgra8Unorm because it's the only format that's supported on my desktop
+        // for consistency.
+        // If it's not supported, just use the first format.
+        let surface_format = if surface_caps.formats.iter().any(|f| match f {
+            wgpu::TextureFormat::Bgra8Unorm => true,
+            _ => false,
+        }) {
+            wgpu::TextureFormat::Bgra8Unorm
+        } else {
+            surface_caps.formats[0]
+        };
+
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
