@@ -1,3 +1,4 @@
+use instant::Duration;
 use wgpu::util::DeviceExt;
 use winit::{
     event::*,
@@ -267,7 +268,7 @@ impl State {
         });
         let num_indices = INDICES.len() as u32;
 
-        let camera_controller = CameraController::new(0.02);
+        let camera_controller = CameraController::new(5.0);
 
         Self {
             window,
@@ -307,8 +308,9 @@ impl State {
         self.camera_controller.process_events(event)
     }
 
-    fn update(&mut self) {
-        self.camera_controller.update_camera(&mut self.camera);
+    fn update(&mut self, timestep: Duration) {
+        self.camera_controller
+            .update_camera(&mut self.camera, timestep);
         self.camera_uniform.update_view_proj(&self.camera);
         self.queue.write_buffer(
             &self.camera_buffer,
@@ -396,6 +398,7 @@ pub async fn run() {
     }
 
     let mut state = State::new(window).await;
+    let mut last_render_time = instant::Instant::now();
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::WindowEvent {
@@ -425,7 +428,10 @@ pub async fn run() {
                 }
             }
             Event::RedrawRequested(window_id) if window_id == state.window().id() => {
-                state.update();
+                let now = instant::Instant::now();
+                let timestep = now - last_render_time;
+                last_render_time = now;
+                state.update(timestep);
                 match state.render() {
                     Ok(_) => {}
                     // Reconfigure the surface if lost
