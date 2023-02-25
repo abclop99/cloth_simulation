@@ -11,15 +11,15 @@ pub struct Model {
 #[repr(C)]
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
-    position: [f32;3],
-    color: [f32;3],
+    position: [f32; 3],
+    color: [f32; 3],
     mass: f32,
 }
 
 #[repr(C)]
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Spring {
-    vertices: [u16;2],
+    vertices: [u16; 2],
     k_s: f32,
     k_d: f32,
 }
@@ -49,7 +49,7 @@ impl Vertex {
                     offset: std::mem::size_of::<[f32; 6]>() as wgpu::BufferAddress,
                     shader_location: 2,
                     format: wgpu::VertexFormat::Float32,
-                }
+                },
             ],
         }
     }
