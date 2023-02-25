@@ -31,14 +31,14 @@ fn main() -> Result<(), ProgramError> {
             ))
         }
     } else {
-        let contents = std::fs::read_to_string(&args[1])?; //.expect("Something went wrong reading the file");
+        let contents = std::fs::read_to_string(&args[1])?;
 
-        let model: serde_json::Result<model::Model> = serde_json::from_str(&contents);
+        let mesh: serde_json::Result<model::Mesh> = serde_json::from_str(&contents);
 
-        match model {
+        match mesh {
             Err(e) => Err(ProgramError::Json(e)),
-            Ok(model) => {
-                pollster::block_on(run(model));
+            Ok(mesh) => {
+                pollster::block_on(run(mesh));
                 Ok(())
             }
         }

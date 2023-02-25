@@ -1,5 +1,4 @@
 use instant::Duration;
-use wgpu::util::DeviceExt;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -10,8 +9,10 @@ use winit::{
 use wasm_bindgen::prelude::*;
 
 mod camera;
-pub mod model;
 use camera::Camera;
+
+pub mod model;
+use model::DrawModel;
 
 struct State {
     surface: wgpu::Surface,
@@ -20,15 +21,13 @@ struct State {
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
     render_pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    num_indices: u32,
+    model: model::Model,
     camera: Camera,
     window: Window,
 }
 
 impl State {
-    async fn new(window: Window, model: model::Model) -> Self {
+    async fn new(window: Window, mesh: model::Mesh) -> Self {
         let size = window.inner_size();
 
         // The instance is a handle to our GPU
@@ -168,17 +167,7 @@ impl State {
             multiview: None,
         });
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(model.vertices.as_slice()),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(model.triangles.as_slice()),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-        let num_indices = model.triangles.len() as u32 * 3;
+        let model = model::Model::new(&device, mesh);
 
         Self {
             window,
@@ -188,10 +177,8 @@ impl State {
             config,
             size,
             render_pipeline,
-            vertex_buffer,
-            index_buffer,
+            model,
             camera,
-            num_indices,
         }
     }
 
@@ -254,9 +241,7 @@ impl State {
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.camera.camera_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+            render_pass.draw_model(&self.model);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -267,7 +252,7 @@ impl State {
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
-pub async fn run(model: model::Model) {
+pub async fn run(mesh: model::Mesh) {
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -298,7 +283,7 @@ pub async fn run(model: model::Model) {
             .expect("Couldn't append canvas to document body.");
     }
 
-    let mut state = State::new(window, model).await;
+    let mut state = State::new(window, mesh).await;
     let mut last_render_time = instant::Instant::now();
     event_loop.run(move |event, _, control_flow| {
         match event {
