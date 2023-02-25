@@ -1,7 +1,6 @@
 //use serde_json::Result;
 
-use cloth_simulation::model;
-use cloth_simulation::run;
+use cloth_simulation_lib::{model, run};
 
 #[derive(Debug)]
 enum ProgramError {
