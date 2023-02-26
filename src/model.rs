@@ -16,28 +16,28 @@ pub struct Mesh {
 #[repr(C)]
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
-    position: [f32; 3],
-    color: [f32; 3],
+    pub position: [f32; 3],
+    pub color: [f32; 3],
     #[serde(default)]
-    normal: [f32; 3],
-    mass: f32,
-    fixed: i32, // Typed as i32 because Pod and transmute?
+    pub normal: [f32; 3],
+    pub mass: f32,
+    pub fixed: i32, // Typed as i32 because Pod and transmute?
     #[serde(default)]
-    velocity: [f32; 3],
+    pub velocity: [f32; 3],
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Spring {
-    vertices: [u16; 2],
-    k_s: f32,
-    k_d: f32,
+    pub vertices: [u16; 2],
+    pub k_s: f32,
+    pub k_d: f32,
     #[serde(default)]
-    rest_length: f32,
+    pub rest_length: f32,
 }
 
 #[repr(C)]
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct Triangle(u16, u16, u16);
+pub struct Triangle(pub u16, pub u16, pub u16);
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct SimulationSettings {
@@ -179,16 +179,16 @@ impl SimulationModel {
         }
 
         // Add triangle indices
-        let first_vertex_index = mesh.vertices.len();
+        let first_vertex_index = mesh.vertices.len() as u16;
         mesh.triangles.push(Triangle(
-            first_vertex_index as u16,
-            (first_vertex_index + 1) as u16,
-            (first_vertex_index + 2) as u16,
+            first_vertex_index,
+            first_vertex_index + 1,
+            first_vertex_index + 2,
         ));
         mesh.triangles.push(Triangle(
-            (first_vertex_index + 2) as u16,
-            (first_vertex_index + 1) as u16,
-            (first_vertex_index + 3) as u16,
+            first_vertex_index + 2,
+            first_vertex_index + 1,
+            first_vertex_index + 3,
         ));
 
         mesh.vertices.append(&mut new_vertices);

@@ -1,6 +1,6 @@
-//use serde_json::Result;
-
 use cloth_simulation_lib::{model, run};
+
+mod cloth_generator;
 
 #[derive(Debug)]
 enum ProgramError {
@@ -19,27 +19,43 @@ fn main() -> Result<(), ProgramError> {
     let args: Vec<String> = std::env::args().collect();
 
     // Check if the user provided a config file for the cloth simulation
-    if args.len() != 2 {
-        if args.is_empty() {
-            Err(ProgramError::InvalidUsage(
-                "Missing all arguments".to_string(),
-            ))
-        } else {
-            Err(ProgramError::InvalidUsage(
-                "Missing simulation config file".to_string(),
-            ))
-        }
-    } else {
-        let contents = std::fs::read_to_string(&args[1])?;
+    match args.len() {
+        0 => Err(ProgramError::InvalidUsage(
+            "Missing all arguments. How did you do that?".to_string(),
+        )),
+        1 => Err(ProgramError::InvalidUsage(format!(
+            "Usage: {} [<config-file> | --cloth <height> <width>]",
+            args[0]
+        ))),
+        2 => {
+            let contents = std::fs::read_to_string(&args[1])?;
 
-        let mesh: serde_json::Result<model::Mesh> = serde_json::from_str(&contents);
+            let mesh: serde_json::Result<model::Mesh> = serde_json::from_str(&contents);
 
-        match mesh {
-            Err(e) => Err(ProgramError::Json(e)),
-            Ok(mesh) => {
-                pollster::block_on(run(mesh));
-                Ok(())
+            match mesh {
+                Err(e) => Err(ProgramError::Json(e)),
+                Ok(mesh) => {
+                    pollster::block_on(run(mesh));
+                    Ok(())
+                }
             }
         }
+        4 => {
+            if args[1] == "--cloth" {
+                let height = args[2].parse::<u32>().unwrap();
+                let width = args[3].parse::<u32>().unwrap();
+
+                let mesh = cloth_generator::generate_cloth_mesh(height, width);
+
+                pollster::block_on(run(mesh));
+                Ok(())
+            } else {
+                Err(ProgramError::InvalidUsage(format!(
+                    "Usage: {} [<config-file> | --cloth <height> <width>]",
+                    args[0]
+                )))
+            }
+        }
+        _ => Err(ProgramError::InvalidUsage("Too many arguments".to_string())),
     }
 }
