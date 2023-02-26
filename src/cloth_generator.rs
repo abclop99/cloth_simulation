@@ -24,7 +24,7 @@ pub fn generate_cloth_mesh(height: u32, width: u32) -> model::Mesh {
         ground_level: -1.0,
         ground_size: 2.0,
         ground_friction: 0.5,
-        ground_restitution: 0.5,
+        ground_restitution: 0.05,
         ground_color: [0.1, 0.5, 0.05],
     };
     let vertices = generate_vertices(height, width);
@@ -52,7 +52,7 @@ fn generate_vertices(height: u32, width: u32) -> Vec<model::Vertex> {
             // Normalize position so the width is 1 and the position is
             // centered horizontally.
             let normalized_x = -(col as f32 / (width - 1) as f32) + 0.5;
-            let normalized_z = -(row as f32 / (width - 1) as f32) + 0.5;
+            let normalized_z = -(row as f32 / (width - 1) as f32) + 1.0;
 
             let position = [normalized_x, normalized_z, 0.0];
             let color = VERTEX_COLOR;

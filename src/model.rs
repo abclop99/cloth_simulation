@@ -267,6 +267,8 @@ impl SimulationModel {
 
         self.integrate_forces(&forces, timestep);
 
+        self.ground_collision();
+
         self.update_normals(queue);
     }
 
@@ -330,6 +332,23 @@ impl SimulationModel {
                 vertex.position[0] += vertex.velocity[0] * timestep.as_secs_f32();
                 vertex.position[1] += vertex.velocity[1] * timestep.as_secs_f32();
                 vertex.position[2] += vertex.velocity[2] * timestep.as_secs_f32();
+            }
+        }
+    }
+
+    // Lazy implementation of collision detection
+    // Collides slightly above ground level
+    fn ground_collision(&mut self) {
+        const GROUND_LEVEL_EPSILON: f32 = 0.001;
+        let ground_level = self.mesh.settings.ground_level + GROUND_LEVEL_EPSILON;
+
+        for vertex in self.mesh.vertices.iter_mut() {
+            if vertex.fixed == 0 && vertex.position[1] < ground_level {
+                let _penetration = ground_level - vertex.position[1];
+                vertex.position[1] = ground_level; // + self.mesh.settings.ground_restitution * penetration;
+                vertex.velocity[1] = -vertex.velocity[1] * self.mesh.settings.ground_restitution;
+
+                // println!("Collision! Penetration: {}, New position: {}, New velocity: {}, Ground level: {}, vertex.fixed: {}", _penetration, vertex.position[1], vertex.velocity[1], self.mesh.settings.ground_level, vertex.fixed);
             }
         }
     }
