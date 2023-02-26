@@ -6,6 +6,7 @@ use wgpu::util::DeviceExt;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Mesh {
     pub name: String,
+    pub settings: SimulationSettings,
     pub vertices: Vec<Vertex>,
     pub springs: Vec<Spring>,
     pub triangles: Vec<Triangle>,
@@ -19,19 +20,32 @@ pub struct Vertex {
     #[serde(default)]
     normal: [f32; 3],
     mass: f32,
+    fixed: i32, // Typed as i32 because Pod and transmute?
+    #[serde(default)]
+    velocity: [f32; 3],
 }
 
-#[repr(C)]
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Spring {
     vertices: [u16; 2],
     k_s: f32,
     k_d: f32,
+    #[serde(default)]
+    rest_length: f32,
 }
 
 #[repr(C)]
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Triangle(u16, u16, u16);
+
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+pub struct SimulationSettings {
+    pub gravity: [f32; 3],
+    pub wind: [f32; 3],
+    pub ground_level: f32,
+    pub ground_friction: f32,
+    pub ground_restitution: f32,
+}
 
 // Describes the memory layout of the vertex data
 impl Vertex {
@@ -66,14 +80,16 @@ impl Vertex {
 }
 
 #[derive(Debug)]
-pub struct Model {
+pub struct SimulationModel {
     mesh: Mesh,
 
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
+
+    triangle_normals: Vec<cgmath::Vector3<f32>>,
 }
 
-impl Model {
+impl SimulationModel {
     pub fn new(device: &wgpu::Device, mut mesh: Mesh) -> Self {
         // Calculate the normals for each vertex and set them in the mesh
         let triangle_normals = Self::compute_triangle_normals(&mesh.vertices, &mesh.triangles);
@@ -84,6 +100,7 @@ impl Model {
             vertex.normal = normal;
         }
 
+        // Create the vertex and index buffers
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
             contents: bytemuck::cast_slice(mesh.vertices.as_slice()),
@@ -95,20 +112,108 @@ impl Model {
             usage: wgpu::BufferUsages::INDEX,
         });
 
+        // Set spring rest lengths to initial distance between vertices
+        for spring in mesh.springs.iter_mut() {
+            let v1 = mesh.vertices[spring.vertices[0] as usize].position;
+            let v2 = mesh.vertices[spring.vertices[1] as usize].position;
+            spring.rest_length = cgmath::Vector3::from(v1).distance(cgmath::Vector3::from(v2));
+        }
+
+        // Set initial velocities
+        for vertex in mesh.vertices.iter_mut() {
+            vertex.velocity = [0.0; 3];
+        }
+
         Self {
             mesh,
             vertex_buffer,
             index_buffer,
+            triangle_normals,
         }
     }
 
-    pub fn update(&mut self, _timestep: Duration, queue: &wgpu::Queue) {
-        let triangle_normals =
+    pub fn update(&mut self, timestep: Duration, queue: &wgpu::Queue) {
+        let mut forces: Vec<cgmath::Vector3<f32>> = vec![[0.0; 3].into(); self.mesh.vertices.len()];
+
+        Self::apply_gravity(&mut forces, self.mesh.settings.gravity);
+        Self::apply_spring_damper_forces(&self.mesh.vertices, &self.mesh.springs, &mut forces);
+
+        self.integrate_forces(&forces, timestep);
+
+        self.update_normals(queue);
+    }
+
+    fn apply_gravity(forces: &mut Vec<cgmath::Vector3<f32>>, gravity: [f32; 3]) {
+        for force in forces.iter_mut() {
+            let gravity: cgmath::Vector3<f32> = gravity.into();
+            *force += gravity;
+        }
+    }
+
+    fn apply_spring_damper_forces(
+        vertices: &Vec<Vertex>,
+        springs: &Vec<Spring>,
+        forces: &mut Vec<cgmath::Vector3<f32>>,
+    ) {
+        for spring in springs {
+            let i_1 = spring.vertices[0] as usize;
+            let i_2 = spring.vertices[1] as usize;
+
+            let r_1: cgmath::Point3<f32> = vertices[i_1].position.into();
+            let r_2: cgmath::Point3<f32> = vertices[i_2].position.into();
+
+            let e = (r_2 - r_1).normalize();
+
+            // Spring
+            // F_s = -k_s * (l - l_0) * e
+            // l = distance between vertices
+            // l_0 = rest length
+            // e = normalized vector from v1 to v2
+            let l = r_1.distance(r_2);
+            let x = spring.rest_length - l;
+            let f_s = -spring.k_s * x * e;
+
+            // Damper
+            // F_d = -k_d * (v_close) * e
+            // v_close = (v1 - v2) * e
+            let v_1: cgmath::Vector3<f32> = vertices[i_1].velocity.into();
+            let v_2: cgmath::Vector3<f32> = vertices[i_2].velocity.into();
+            let v_close = (v_1 - v_2).dot(e);
+            let f_d = -spring.k_d * v_close * e;
+
+            // Add forces to vertices
+            forces[i_1] += f_s + f_d;
+            forces[i_2] -= f_s + f_d;
+        }
+    }
+
+    fn integrate_forces(&mut self, forces: &Vec<cgmath::Vector3<f32>>, timestep: Duration) {
+        // Integrate forces
+        for (vertex, force) in self.mesh.vertices.iter_mut().zip(forces) {
+            let acceleration = *force / vertex.mass;
+
+            if vertex.fixed != 0 {
+                vertex.velocity = [0.0; 3];
+                continue;
+            } else {
+                vertex.velocity[0] += acceleration[0] * timestep.as_secs_f32();
+                vertex.velocity[1] += acceleration[1] * timestep.as_secs_f32();
+                vertex.velocity[2] += acceleration[2] * timestep.as_secs_f32();
+
+                vertex.position[0] += vertex.velocity[0] * timestep.as_secs_f32();
+                vertex.position[1] += vertex.velocity[1] * timestep.as_secs_f32();
+                vertex.position[2] += vertex.velocity[2] * timestep.as_secs_f32();
+            }
+        }
+    }
+
+    fn update_normals(&mut self, queue: &wgpu::Queue) {
+        self.triangle_normals =
             Self::compute_triangle_normals(&self.mesh.vertices, &self.mesh.triangles);
         let vertex_normals = Self::compute_vertex_normals(
             &self.mesh.vertices,
             &self.mesh.triangles,
-            &triangle_normals,
+            &self.triangle_normals,
         );
 
         for (vertex, normal) in self.mesh.vertices.iter_mut().zip(vertex_normals) {
@@ -166,14 +271,14 @@ impl Model {
 }
 
 pub trait DrawModel<'a> {
-    fn draw_model(&mut self, model: &'a Model);
+    fn draw_model(&mut self, model: &'a SimulationModel);
 }
 
 impl<'a, 'b> DrawModel<'a> for wgpu::RenderPass<'b>
 where
     'a: 'b,
 {
-    fn draw_model(&mut self, model: &'b Model) {
+    fn draw_model(&mut self, model: &'b SimulationModel) {
         self.set_vertex_buffer(0, model.vertex_buffer.slice(..));
         self.set_index_buffer(model.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
         self.draw_indexed(0..model.get_num_indices(), 0, 0..1);

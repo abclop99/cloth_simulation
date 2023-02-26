@@ -21,7 +21,7 @@ struct State {
     size: winit::dpi::PhysicalSize<u32>,
     render_pipeline: wgpu::RenderPipeline,
     depth_texture: texture::Texture,
-    model: model::Model,
+    model: model::SimulationModel,
     camera: Camera,
     window: Window,
 }
@@ -100,7 +100,7 @@ impl State {
             &device,
             // position the camera one unit up and 2 units back
             // +z is out of the screen
-            (0.0, 1.0, 2.0).into(),
+            (0.0, 2.0, 4.0).into(),
             // have it look at the origin
             (0.0, 0.0, 0.0).into(),
             // which way is "up"
@@ -173,7 +173,7 @@ impl State {
         let depth_texture =
             texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
-        let model = model::Model::new(&device, mesh);
+        let model = model::SimulationModel::new(&device, mesh);
 
         Self {
             window,
