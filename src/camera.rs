@@ -1,5 +1,6 @@
 use instant::Duration;
 use wgpu::util::DeviceExt;
+use winit::dpi::PhysicalPosition;
 use winit::event::*;
 
 pub struct Camera {
@@ -30,6 +31,7 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 impl Camera {
     pub fn update(&mut self, timestep: Duration, queue: &wgpu::Queue) {
         self.eye = self.camera_controller.update_camera(&self, timestep);
+        self.camera_controller.scroll = 0.0;
 
         self.update_view_proj();
         queue.write_buffer(
@@ -110,6 +112,10 @@ impl Camera {
         self.camera_uniform.view_proj = self.build_view_projection_matrix().into();
     }
 
+    pub fn get_view_proj(&self) -> cgmath::Matrix4<f32> {
+        self.camera_uniform.view_proj.into()
+    }
+
     fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
         Self::build_view_projection_matrix_fields(
             self.eye,
@@ -144,20 +150,27 @@ pub struct CameraUniform {
 
 pub struct CameraController {
     speed: f32,
-    is_forward_pressed: bool,
-    is_backward_pressed: bool,
+    is_up_pressed: bool,
+    is_down_pressed: bool,
     is_left_pressed: bool,
     is_right_pressed: bool,
+    is_forward_pressed: bool,
+    is_backward_pressed: bool,
+    scroll: f32,
 }
 
 impl CameraController {
     pub fn new(speed: f32) -> Self {
         Self {
             speed,
-            is_forward_pressed: false,
-            is_backward_pressed: false,
+            is_up_pressed: false,
+            is_down_pressed: false,
             is_left_pressed: false,
             is_right_pressed: false,
+
+            is_forward_pressed: false,
+            is_backward_pressed: false,
+            scroll: 0.0,
         }
     }
 
@@ -174,24 +187,41 @@ impl CameraController {
             } => {
                 let is_pressed = *state == ElementState::Pressed;
                 match keycode {
-                    VirtualKeyCode::W | VirtualKeyCode::Up => {
-                        self.is_forward_pressed = is_pressed;
+                    VirtualKeyCode::Up => {
+                        self.is_up_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::A | VirtualKeyCode::Left => {
+                    VirtualKeyCode::Left => {
                         self.is_left_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::S | VirtualKeyCode::Down => {
-                        self.is_backward_pressed = is_pressed;
+                    VirtualKeyCode::Down => {
+                        self.is_down_pressed = is_pressed;
                         true
                     }
-                    VirtualKeyCode::D | VirtualKeyCode::Right => {
+                    VirtualKeyCode::Right => {
                         self.is_right_pressed = is_pressed;
+                        true
+                    }
+                    VirtualKeyCode::A => {
+                        self.is_forward_pressed = is_pressed;
+                        true
+                    }
+                    VirtualKeyCode::Z => {
+                        self.is_backward_pressed = is_pressed;
                         true
                     }
                     _ => false,
                 }
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                self.scroll -= match delta {
+                    MouseScrollDelta::LineDelta(_, y) => *y * 100.0, // Assuming 100 pixels per line
+                    MouseScrollDelta::PixelDelta(PhysicalPosition { y: scroll, .. }) => {
+                        *scroll as f32
+                    }
+                };
+                true
             }
             _ => false,
         }
@@ -216,22 +246,35 @@ impl CameraController {
             eye -= forward_norm * self.speed * timestep;
         }
 
+        // Scroll wheel zoom
+        if self.scroll != 0.0 {
+            eye += forward_norm * self.scroll * timestep;
+        }
+
         let right = forward_norm.cross(camera.up);
 
         // Redo radius calc in case the fowrard/backward is pressed.
         let forward = camera.target - camera.eye;
         let forward_mag = forward.magnitude();
 
-        if self.is_right_pressed {
+        if self.is_right_pressed && !self.is_left_pressed {
             // Rescale the distance between the target and eye so
             // that it doesn't change. The eye therefore still
             // lies on the circle made by the target and eye.
             eye =
+                camera.target - (forward - right * self.speed * timestep).normalize() * forward_mag;
+        }
+        if self.is_left_pressed && !self.is_right_pressed {
+            eye =
                 camera.target - (forward + right * self.speed * timestep).normalize() * forward_mag;
         }
-        if self.is_left_pressed {
-            eye =
-                camera.target - (forward - right * self.speed * timestep).normalize() * forward_mag;
+        if self.is_up_pressed && !self.is_down_pressed {
+            eye = camera.target
+                - (forward - camera.up * self.speed * timestep).normalize() * forward_mag;
+        }
+        if self.is_down_pressed && !self.is_up_pressed {
+            eye = camera.target
+                - (forward + camera.up * self.speed * timestep).normalize() * forward_mag;
         }
 
         eye

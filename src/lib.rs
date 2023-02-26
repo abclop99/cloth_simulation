@@ -209,6 +209,12 @@ impl State {
 
     fn input(&mut self, event: &WindowEvent) -> bool {
         self.camera.camera_controller.process_events(event)
+            || self.model.process_window_event(event)
+    }
+
+    fn input_mouse_motion(&mut self, delta: (f64, f64)) {
+        self.model
+            .input_mouse_motion(delta, self.camera.get_view_proj(), &self.size);
     }
 
     fn update(&mut self, timestep: Duration) {
@@ -280,6 +286,12 @@ pub async fn run(mesh: model::Mesh) {
     let mut last_render_time = instant::Instant::now();
     event_loop.run(move |event, _, control_flow| {
         match event {
+            Event::DeviceEvent {
+                event: DeviceEvent::MouseMotion { delta: (x, y) },
+                ..
+            } => {
+                state.input_mouse_motion((x, y));
+            }
             Event::WindowEvent {
                 ref event,
                 window_id,

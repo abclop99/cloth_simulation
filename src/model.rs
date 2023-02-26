@@ -2,6 +2,7 @@ use cgmath::prelude::*;
 use instant::Duration;
 use serde::{Deserialize, Serialize};
 use wgpu::util::DeviceExt;
+use winit::event::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Mesh {
@@ -89,10 +90,25 @@ pub struct SimulationModel {
     index_buffer: wgpu::Buffer,
 
     triangle_normals: Vec<cgmath::Vector3<f32>>,
+
+    // Fixed vertices that can be moved by the user
+    movable_vertices: Vec<usize>,
+
+    paused: bool,
+    mouse_pressed: bool,
 }
 
 impl SimulationModel {
     pub fn new(device: &wgpu::Device, mut mesh: Mesh) -> Self {
+        // Set fixed, user movable vertices before adding ground plane
+        let movable_vertices = mesh
+            .vertices
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| v.fixed == 1)
+            .map(|(i, _)| i)
+            .collect();
+
         Self::add_ground_plane(&mut mesh);
 
         // Calculate the normals for each vertex and set them in the mesh
@@ -133,6 +149,9 @@ impl SimulationModel {
             vertex_buffer,
             index_buffer,
             triangle_normals,
+            movable_vertices,
+            paused: false,
+            mouse_pressed: false,
         }
     }
 
@@ -175,7 +194,72 @@ impl SimulationModel {
         mesh.vertices.append(&mut new_vertices);
     }
 
+    pub fn process_window_event(&mut self, event: &WindowEvent) -> bool {
+        match event {
+            WindowEvent::KeyboardInput { input, .. } => {
+                if let Some(keycode) = input.virtual_keycode {
+                    match keycode {
+                        VirtualKeyCode::Space => {
+                            if input.state == ElementState::Pressed {
+                                self.paused = !self.paused;
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        _ => false,
+                    }
+                } else {
+                    false
+                }
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                if *button == MouseButton::Left {
+                    self.mouse_pressed = *state == ElementState::Pressed;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    pub fn input_mouse_motion(
+        &mut self,
+        mouse_delta: (f64, f64),
+        camera_view: cgmath::Matrix4<f32>,
+        screen_size: &winit::dpi::PhysicalSize<u32>,
+    ) {
+        if self.mouse_pressed {
+            const MOUSE_SENSITIVITY: f32 = 12.0;
+
+            let inv_camera_view = match camera_view.invert() {
+                Some(inv) => inv,
+                None => return,
+            };
+
+            // Move the movable vertices
+            let vertex_delta: cgmath::Vector3<f32> =
+                [mouse_delta.0 as f32, -mouse_delta.1 as f32, 0.0].into();
+            let vertex_delta = inv_camera_view.transform_vector(vertex_delta);
+
+            for vertex_index in self.movable_vertices.iter() {
+                self.mesh.vertices[*vertex_index].position[0] +=
+                    vertex_delta.x / screen_size.width as f32 * MOUSE_SENSITIVITY;
+                self.mesh.vertices[*vertex_index].position[1] +=
+                    vertex_delta.y / screen_size.width as f32 * MOUSE_SENSITIVITY;
+                self.mesh.vertices[*vertex_index].position[2] +=
+                    vertex_delta.z / screen_size.width as f32 * MOUSE_SENSITIVITY;
+            }
+        }
+    }
+
     pub fn update(&mut self, timestep: Duration, queue: &wgpu::Queue) {
+        if self.paused {
+            return;
+        }
+
         let mut forces: Vec<cgmath::Vector3<f32>> = vec![[0.0; 3].into(); self.mesh.vertices.len()];
 
         Self::apply_gravity(&mut forces, self.mesh.settings.gravity);
