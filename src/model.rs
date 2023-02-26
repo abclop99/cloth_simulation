@@ -43,8 +43,10 @@ pub struct SimulationSettings {
     pub gravity: [f32; 3],
     pub wind: [f32; 3],
     pub ground_level: f32,
+    pub ground_size: f32,
     pub ground_friction: f32,
     pub ground_restitution: f32,
+    pub ground_color: [f32; 3],
 }
 
 // Describes the memory layout of the vertex data
@@ -91,6 +93,8 @@ pub struct SimulationModel {
 
 impl SimulationModel {
     pub fn new(device: &wgpu::Device, mut mesh: Mesh) -> Self {
+        Self::add_ground_plane(&mut mesh);
+
         // Calculate the normals for each vertex and set them in the mesh
         let triangle_normals = Self::compute_triangle_normals(&mesh.vertices, &mesh.triangles);
         let vertex_normals: Vec<[f32; 3]> =
@@ -130,6 +134,45 @@ impl SimulationModel {
             index_buffer,
             triangle_normals,
         }
+    }
+
+    // Add ground plane as fixed vertices and traingles added to the mesh
+    fn add_ground_plane(mesh: &mut Mesh) {
+        let ground_level = mesh.settings.ground_level;
+        let ground_size = mesh.settings.ground_size;
+
+        let mut new_vertices: Vec<Vertex> = vec![];
+
+        for x in 0..2 {
+            for z in 0..2 {
+                let x = (x as f32 - 0.5) * ground_size;
+                let z = (z as f32 - 0.5) * ground_size;
+
+                new_vertices.push(Vertex {
+                    position: [x, ground_level, z],
+                    color: mesh.settings.ground_color,
+                    normal: [0.0, 1.0, 0.0],
+                    mass: 0.0,
+                    fixed: 1,
+                    velocity: [0.0; 3],
+                });
+            }
+        }
+
+        // Add triangle indices
+        let first_vertex_index = mesh.vertices.len();
+        mesh.triangles.push(Triangle(
+            first_vertex_index as u16,
+            (first_vertex_index + 1) as u16,
+            (first_vertex_index + 2) as u16,
+        ));
+        mesh.triangles.push(Triangle(
+            (first_vertex_index + 2) as u16,
+            (first_vertex_index + 1) as u16,
+            (first_vertex_index + 3) as u16,
+        ));
+
+        mesh.vertices.append(&mut new_vertices);
     }
 
     pub fn update(&mut self, timestep: Duration, queue: &wgpu::Queue) {

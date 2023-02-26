@@ -6,7 +6,8 @@
 		"ground_level": -1,
 		"ground_size": 3,
 		"ground_friction": 0.5,
-		"ground_restitution": 0.5
+		"ground_restitution": 0.5,
+		"ground_color": [0.1, 0.5, 0.05]
 	},
 	"vertices": [
 		{ "position": [-0.5, -0.5, -0.5], "color": [0.5, 0.0, 0.5], "mass": 0.01, "fixed": 0 },
