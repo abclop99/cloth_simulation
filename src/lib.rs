@@ -62,8 +62,7 @@ impl State {
                         // Use to downlevel defaults because lower limits
                         // initially are better the compute example uses this,
                         // and I probably want to use compute shaders eventually.
-                        wgpu::Limits::downlevel_defaults()
-                        //wgpu::Limits::downlevel_webgl2_defaults()
+                        wgpu::Limits::default()
                     },
                     label: None,
                 },
