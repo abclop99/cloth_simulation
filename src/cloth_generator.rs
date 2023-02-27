@@ -20,7 +20,7 @@ pub fn generate_cloth_mesh(height: u32, width: u32) -> model::Mesh {
     let name = format!("Cloth: {}x{}", height, width);
     let settings = model::SimulationSettings {
         gravity: [0.0, GRAVITY_AMOUNT, 0.0],
-        wind: [0.2, 0.0, 0.05],
+        wind: [2.2, 0.0, 2.05],
         fluid_density: 1.2,
         ground_level: -1.0,
         ground_size: 2.0,
