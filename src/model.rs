@@ -389,6 +389,7 @@ impl SimulationModel {
             let density = settings.fluid_density;
 
             let area = triangle.area(vertices);
+            let area = area * v.normalize().dot(n);
 
             let f_a = -0.5 * density * v.magnitude2() * COEFFICIENT * area * n;
 
