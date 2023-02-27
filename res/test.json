@@ -3,22 +3,23 @@
 	"settings": {
 		"gravity": [0, -9.81, 0],
 		"wind": [0, 0, 0],
+		"fluid_density": 1.2,
 		"ground_level": -1,
 		"ground_size": 3,
 		"ground_friction_static": 0.5,
 		"ground_friction_dynamic": 0.4,
-		"ground_restitution": 0.5,
+		"ground_restitution": 0.05,
 		"ground_color": [0.1, 0.5, 0.05]
 	},
 	"vertices": [
-		{ "position": [-0.5, -0.5, -0.5], "color": [0.5, 0.0, 0.5], "mass": 0.01, "fixed": 0 },
-		{ "position": [-0.5, -0.5,  0.5], "color": [0.5, 0.0, 0.5], "mass": 0.01, "fixed": 0 },
-		{ "position": [-0.5,  0.5, -0.5], "color": [0.5, 0.0, 0.5], "mass": 0.01, "fixed": 1 },
-		{ "position": [-0.5,  0.5,  0.5], "color": [0.5, 0.0, 0.5], "mass": 0.01, "fixed": 0 },
-		{ "position": [ 0.5, -0.5, -0.5], "color": [0.5, 0.0, 0.5], "mass": 0.01, "fixed": 0 },
-		{ "position": [ 0.5, -0.5,  0.5], "color": [0.5, 0.0, 0.5], "mass": 0.01, "fixed": 0 },
-		{ "position": [ 0.5,  0.5, -0.5], "color": [0.5, 0.0, 0.5], "mass": 0.01, "fixed": 1 },
-		{ "position": [ 0.5,  0.5,  0.5], "color": [0.5, 0.0, 0.5], "mass": 0.01, "fixed": 1 }
+		{ "position": [-0.5, -0.5, -0.5], "color": [0.5, 0.0, 0.5], "mass": 0.1, "fixed": 0 },
+		{ "position": [-0.5, -0.5,  0.5], "color": [0.5, 0.0, 0.5], "mass": 0.1, "fixed": 0 },
+		{ "position": [-0.5,  0.5, -0.5], "color": [0.5, 0.0, 0.5], "mass": 0.1, "fixed": 1 },
+		{ "position": [-0.5,  0.5,  0.5], "color": [0.5, 0.0, 0.5], "mass": 0.1, "fixed": 0 },
+		{ "position": [ 0.5, -0.5, -0.5], "color": [0.5, 0.0, 0.5], "mass": 0.1, "fixed": 0 },
+		{ "position": [ 0.5, -0.5,  0.5], "color": [0.5, 0.0, 0.5], "mass": 0.1, "fixed": 0 },
+		{ "position": [ 0.5,  0.5, -0.5], "color": [0.5, 0.0, 0.5], "mass": 0.1, "fixed": 0 },
+		{ "position": [ 0.5,  0.5,  0.5], "color": [0.5, 0.0, 0.5], "mass": 0.1, "fixed": 0 }
 	],
 	"springs": [
 		{ "vertices": [0, 1], "k_s": 41.21, "k_d": 2.112 },
