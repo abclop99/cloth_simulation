@@ -258,7 +258,7 @@ impl SimulationModel {
         screen_size: &winit::dpi::PhysicalSize<u32>,
     ) {
         if self.mouse_pressed {
-            const MOUSE_SENSITIVITY: f32 = 12.0;
+            const MOUSE_SENSITIVITY: f32 = 20.0;
 
             let inv_camera_view = match camera_view.invert() {
                 Some(inv) => inv,
@@ -270,13 +270,15 @@ impl SimulationModel {
                 [mouse_delta.0 as f32, -mouse_delta.1 as f32, 0.0].into();
             let vertex_delta = inv_camera_view.transform_vector(vertex_delta);
 
+            let screen_height = screen_size.height as f32;
+
             for vertex_index in self.movable_vertices.iter() {
                 self.mesh.vertices[*vertex_index].position[0] +=
-                    vertex_delta.x / screen_size.width as f32 * MOUSE_SENSITIVITY;
+                    vertex_delta.x / screen_height * MOUSE_SENSITIVITY;
                 self.mesh.vertices[*vertex_index].position[1] +=
-                    vertex_delta.y / screen_size.width as f32 * MOUSE_SENSITIVITY;
+                    vertex_delta.y / screen_height * MOUSE_SENSITIVITY;
                 self.mesh.vertices[*vertex_index].position[2] +=
-                    vertex_delta.z / screen_size.width as f32 * MOUSE_SENSITIVITY;
+                    vertex_delta.z / screen_height * MOUSE_SENSITIVITY;
             }
         }
     }
