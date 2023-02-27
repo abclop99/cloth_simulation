@@ -111,7 +111,7 @@ impl State {
             100.0,
         );
 
-        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+        let render_shader = device.create_shader_module(wgpu::include_wgsl!("render.wgsl"));
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -124,12 +124,12 @@ impl State {
             label: Some("Render Pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &shader,
+                module: &render_shader,
                 entry_point: "vert_main",
                 buffers: &[model::Vertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &shader,
+                module: &render_shader,
                 entry_point: "frag_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
@@ -222,7 +222,7 @@ impl State {
         //    .update_camera(&mut self.camera, timestep);
         self.camera.update(timestep, &self.queue);
 
-        self.model.update(timestep, &self.queue);
+        //self.model.update(timestep, &self.queue);
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -238,6 +238,7 @@ impl State {
                 label: Some("Render Encoder"),
             });
 
+        encoder.push_debug_group("Render");
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
@@ -268,6 +269,7 @@ impl State {
             render_pass.set_bind_group(0, &self.camera.camera_bind_group, &[]);
             render_pass.draw_model(&self.model);
         }
+        encoder.pop_debug_group();
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();

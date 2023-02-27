@@ -170,6 +170,10 @@ impl SimulationModel {
             vertex.velocity = [0.0; 3];
         }
 
+        println!("Number of vertices: {}", mesh.vertices.len());
+        println!("Number of triangles: {}", mesh.triangles.len());
+        println!("Number of springs: {}", mesh.springs.len());
+
         Self {
             mesh,
             vertex_buffer,
@@ -402,6 +406,8 @@ impl SimulationModel {
     }
 
     // Removes the forces if the spring is too long and the force is pulling the vertices apart
+    // TODO: Deal with this
+    #[allow(dead_code)]
     fn limit_lengths(
         springs: &Vec<Spring>,
         vertices: &Vec<Vertex>,
