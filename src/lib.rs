@@ -1,4 +1,5 @@
-use instant::Duration;
+//use instant::Duration;
+use std::time::{Instant, Duration};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -222,7 +223,8 @@ impl State {
         //    .update_camera(&mut self.camera, timestep);
         self.camera.update(timestep, &self.queue);
 
-        self.model.update(timestep, &self.queue);
+        self.model.update(timestep.mul_f32(0.5), &self.queue);
+        self.model.update(timestep.mul_f32(0.5), &self.queue);
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -283,7 +285,7 @@ pub async fn run(mesh: model::Mesh) {
     let window = WindowBuilder::new().build(&event_loop).unwrap();
 
     let mut state = State::new(window, mesh).await;
-    let mut last_render_time = instant::Instant::now();
+    let mut last_render_time = Instant::now();
     event_loop.run(move |event, _, control_flow| {
         match event {
             Event::DeviceEvent {
@@ -319,7 +321,7 @@ pub async fn run(mesh: model::Mesh) {
                 }
             }
             Event::RedrawRequested(window_id) if window_id == state.window().id() => {
-                let now = instant::Instant::now();
+                let now = Instant::now();
                 let timestep = now - last_render_time;
                 last_render_time = now;
                 state.update(timestep);

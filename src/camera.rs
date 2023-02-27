@@ -1,4 +1,4 @@
-use instant::Duration;
+use std::time::Duration;
 use wgpu::util::DeviceExt;
 use winit::dpi::PhysicalPosition;
 use winit::event::*;
