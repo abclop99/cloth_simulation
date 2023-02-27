@@ -121,7 +121,8 @@ pub struct SimulationModel {
     movable_vertices: Vec<usize>,
 
     paused: bool,
-    mouse_pressed: bool,
+    left_mouse_pressed: bool,
+    wind_adjust_pressed: bool,
 }
 
 impl SimulationModel {
@@ -177,7 +178,8 @@ impl SimulationModel {
             triangle_normals,
             movable_vertices,
             paused: false,
-            mouse_pressed: false,
+            left_mouse_pressed: false,
+            wind_adjust_pressed: false,
         }
     }
 
@@ -233,6 +235,14 @@ impl SimulationModel {
                                 false
                             }
                         }
+                        VirtualKeyCode::W => {
+                            self.wind_adjust_pressed = input.state == ElementState::Pressed;
+
+                            if !self.wind_adjust_pressed {
+                                println!("Wind speed: {:?}", self.mesh.settings.wind);
+                            }
+                            true
+                        }
                         _ => false,
                     }
                 } else {
@@ -240,11 +250,12 @@ impl SimulationModel {
                 }
             }
             WindowEvent::MouseInput { state, button, .. } => {
-                if *button == MouseButton::Left {
-                    self.mouse_pressed = *state == ElementState::Pressed;
-                    true
-                } else {
-                    false
+                match button {
+                    MouseButton::Left => {
+                        self.left_mouse_pressed = *state == ElementState::Pressed;
+                        true
+                    }
+                    _ => false
                 }
             }
             _ => false,
@@ -257,7 +268,17 @@ impl SimulationModel {
         camera_view: cgmath::Matrix4<f32>,
         screen_size: &winit::dpi::PhysicalSize<u32>,
     ) {
-        if self.mouse_pressed {
+        if self.wind_adjust_pressed {
+            const WIND_ADJUST_SENSITIVITY: f32 = 5.0;
+
+            let screen_height = screen_size.height as f32;
+
+            let delta_x: f32 = mouse_delta.0 as f32 * WIND_ADJUST_SENSITIVITY / screen_height;
+            let delta_y: f32 = mouse_delta.1 as f32 * WIND_ADJUST_SENSITIVITY / screen_height;
+
+            self.mesh.settings.wind[0] += delta_x;
+            self.mesh.settings.wind[2] += delta_y;
+        } else if self.left_mouse_pressed {
             const MOUSE_SENSITIVITY: f32 = 20.0;
 
             let inv_camera_view = match camera_view.invert() {
