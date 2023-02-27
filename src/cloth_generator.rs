@@ -8,7 +8,7 @@ const VERTEX_MASS: f32 = 0.01;
 const SPRING_CONSTANT: f32 = 100.0;
 const SPRING_DAMPING: f32 = 0.5;
 
-const BENDING_SPRING_CONSTANT: f32 = 30.0;
+const BENDING_SPRING_CONSTANT: f32 = 50.0;
 const BENDING_SPRING_DAMPING: f32 = 0.3;
 
 struct Position {
@@ -23,7 +23,8 @@ pub fn generate_cloth_mesh(height: u32, width: u32) -> model::Mesh {
         wind: [0.05, 0.0, 0.05],
         ground_level: -1.0,
         ground_size: 2.0,
-        ground_friction: 0.5,
+        ground_friction_static: 0.5,
+        ground_friction_dynamic: 0.3,
         ground_restitution: 0.05,
         ground_color: [0.1, 0.5, 0.05],
     };

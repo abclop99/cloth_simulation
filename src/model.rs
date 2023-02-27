@@ -45,7 +45,8 @@ pub struct SimulationSettings {
     pub wind: [f32; 3],
     pub ground_level: f32,
     pub ground_size: f32,
-    pub ground_friction: f32,
+    pub ground_friction_static: f32,
+    pub ground_friction_dynamic: f32,
     pub ground_restitution: f32,
     pub ground_color: [f32; 3],
 }
@@ -267,8 +268,6 @@ impl SimulationModel {
 
         self.integrate_forces(&forces, timestep);
 
-        self.ground_collision();
-
         self.update_normals(queue);
     }
 
@@ -329,27 +328,74 @@ impl SimulationModel {
                 vertex.velocity[1] += acceleration[1] * timestep.as_secs_f32();
                 vertex.velocity[2] += acceleration[2] * timestep.as_secs_f32();
 
-                vertex.position[0] += vertex.velocity[0] * timestep.as_secs_f32();
-                vertex.position[1] += vertex.velocity[1] * timestep.as_secs_f32();
-                vertex.position[2] += vertex.velocity[2] * timestep.as_secs_f32();
+                let velocity: cgmath::Vector3<f32> = vertex.velocity.into();
+                let new_position: cgmath::Point3<f32> = vertex.position.into();
+                let new_postion = new_position + velocity * timestep.as_secs_f32();
+
+                Self::ground_collistion(
+                    &self.mesh.settings,
+                    vertex,
+                    force,
+                    &new_postion,
+                    timestep,
+                );
+
+                //vertex.position[0] += vertex.velocity[0] * timestep.as_secs_f32();
+                //vertex.position[1] += vertex.velocity[1] * timestep.as_secs_f32();
+                //vertex.position[2] += vertex.velocity[2] * timestep.as_secs_f32();
             }
         }
     }
 
-    // Lazy implementation of collision detection
-    // Collides slightly above ground level
-    fn ground_collision(&mut self) {
+    fn ground_collistion(
+        settings: &SimulationSettings,
+        vertex: &mut Vertex,
+        force: &cgmath::Vector3<f32>,
+        new_position: &cgmath::Point3<f32>,
+        timestep: Duration,
+    ) {
         const GROUND_LEVEL_EPSILON: f32 = 0.001;
-        let ground_level = self.mesh.settings.ground_level + GROUND_LEVEL_EPSILON;
+        let _ground_level = settings.ground_level + GROUND_LEVEL_EPSILON;
 
-        for vertex in self.mesh.vertices.iter_mut() {
-            if vertex.fixed == 0 && vertex.position[1] < ground_level {
-                let _penetration = ground_level - vertex.position[1];
-                vertex.position[1] = ground_level; // + self.mesh.settings.ground_restitution * penetration;
-                vertex.velocity[1] = -vertex.velocity[1] * self.mesh.settings.ground_restitution;
+        // Threshold of movement before friction is applied
+        const STATIC_FRICTION_THRESHOLD: f32 = 0.01;
 
-                // println!("Collision! Penetration: {}, New position: {}, New velocity: {}, Ground level: {}, vertex.fixed: {}", _penetration, vertex.position[1], vertex.velocity[1], self.mesh.settings.ground_level, vertex.fixed);
-            }
+        if vertex.fixed == 0 && new_position[1] < _ground_level {
+            // Friction
+            let velocity: cgmath::Vector3<f32> = vertex.velocity.into();
+            let v_tan =
+                velocity - velocity.dot(cgmath::Vector3::unit_y()) * cgmath::Vector3::unit_y();
+            let f_n = force.dot(cgmath::Vector3::unit_y()) * cgmath::Vector3::unit_y();
+
+            let f_s = (-f_n * settings.ground_friction_static).magnitude() * v_tan.normalize();
+
+            let impulse: cgmath::Vector3<f32> = if v_tan.magnitude() < STATIC_FRICTION_THRESHOLD
+                && f_s.magnitude() / vertex.mass < v_tan.magnitude()
+            {
+                -v_tan
+            } else {
+                (-f_n * settings.ground_friction_dynamic).magnitude()
+                    * (-v_tan.normalize())
+                    * timestep.as_secs_f32()
+                    / vertex.mass
+            };
+
+            vertex.velocity[0] += impulse[0];
+            vertex.velocity[1] += impulse[1];
+            vertex.velocity[2] += impulse[2];
+
+            // collision
+            let penetration = _ground_level - new_position[1];
+            vertex.position[1] = _ground_level + settings.ground_restitution * penetration;
+            vertex.velocity[1] = -vertex.velocity[1] * settings.ground_restitution;
+
+            vertex.position[0] = new_position[0];
+            //vertex.position[1] = new_position[1];
+            vertex.position[2] = new_position[2];
+        } else {
+            vertex.position[0] = new_position[0];
+            vertex.position[1] = new_position[1];
+            vertex.position[2] = new_position[2];
         }
     }
 

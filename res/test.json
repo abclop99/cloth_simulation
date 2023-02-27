@@ -5,7 +5,8 @@
 		"wind": [0, 0, 0],
 		"ground_level": -1,
 		"ground_size": 3,
-		"ground_friction": 0.5,
+		"ground_friction_static": 0.5,
+		"ground_friction_dynamic": 0.4,
 		"ground_restitution": 0.5,
 		"ground_color": [0.1, 0.5, 0.05]
 	},
