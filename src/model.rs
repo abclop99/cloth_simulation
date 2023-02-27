@@ -39,10 +39,35 @@ pub struct Spring {
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Triangle(pub u16, pub u16, pub u16);
 
+impl Triangle {
+    pub fn normal(&self, vertices: &[Vertex]) -> cgmath::Vector3<f32> {
+        let v0 = cgmath::Vector3::from(vertices[self.0 as usize].position);
+        let v1 = cgmath::Vector3::from(vertices[self.1 as usize].position);
+        let v2 = cgmath::Vector3::from(vertices[self.2 as usize].position);
+
+        let e0 = v1 - v0;
+        let e1 = v2 - v0;
+
+        e0.cross(e1).normalize()
+    }
+
+    pub fn area(&self, vertices: &[Vertex]) -> f32 {
+        let v0 = cgmath::Vector3::from(vertices[self.0 as usize].position);
+        let v1 = cgmath::Vector3::from(vertices[self.1 as usize].position);
+        let v2 = cgmath::Vector3::from(vertices[self.2 as usize].position);
+
+        let e0 = v1 - v0;
+        let e1 = v2 - v0;
+
+        0.5 * e0.cross(e1).magnitude()
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct SimulationSettings {
     pub gravity: [f32; 3],
     pub wind: [f32; 3],
+    pub fluid_density: f32,
     pub ground_level: f32,
     pub ground_size: f32,
     pub ground_friction_static: f32,
@@ -265,6 +290,12 @@ impl SimulationModel {
 
         Self::apply_gravity(&mut forces, self.mesh.settings.gravity);
         Self::apply_spring_damper_forces(&self.mesh.vertices, &self.mesh.springs, &mut forces);
+        Self::apply_aerodynamic_forces(
+            &self.mesh.vertices,
+            &self.mesh.triangles,
+            &self.mesh.settings,
+            &mut forces,
+        );
 
         self.integrate_forces(&forces, timestep);
 
@@ -309,9 +340,58 @@ impl SimulationModel {
             let v_close = (v_1 - v_2).dot(e);
             let f_d = -spring.k_d * v_close * e;
 
+            // Limit forces to finite values
+            // This is necessary because the simulation can get unstable
+            // and produce NaN values
+            if f_s.magnitude2().is_finite() && f_d.magnitude2().is_finite() {
+                forces[i_1] += f_s + f_d;
+                forces[i_2] -= f_s + f_d;
+            }
+        }
+    }
+
+    fn apply_aerodynamic_forces(
+        vertices: &Vec<Vertex>,
+        triangles: &Vec<Triangle>,
+        settings: &SimulationSettings,
+        forces: &mut Vec<cgmath::Vector3<f32>>,
+    ) {
+        const COEFFICIENT: f32 = 1.28;
+
+        for triangle in triangles {
+            let i_1 = triangle.0 as usize;
+            let i_2 = triangle.1 as usize;
+            let i_3 = triangle.2 as usize;
+
+            let r_1: cgmath::Point3<f32> = vertices[i_1].position.into();
+            let r_2: cgmath::Point3<f32> = vertices[i_2].position.into();
+            let r_3: cgmath::Point3<f32> = vertices[i_3].position.into();
+
+            let e_1 = (r_2 - r_1).normalize();
+            let e_2 = (r_3 - r_1).normalize();
+
+            let n = e_1.cross(e_2).normalize();
+
+            // Aerodynamic
+            // F_a = -0.5 * density * (v)^2 * coefficient * area * n
+            let v_1: cgmath::Vector3<f32> = vertices[i_1].velocity.into();
+            let v_2: cgmath::Vector3<f32> = vertices[i_2].velocity.into();
+            let v_3: cgmath::Vector3<f32> = vertices[i_3].velocity.into();
+            let v: cgmath::Vector3<f32> =
+                ((v_1 + v_2 + v_3) / 3.0) - cgmath::Vector3::from(settings.wind);
+
+            let density = settings.fluid_density;
+
+            let area = triangle.area(vertices);
+
+            let f_a = -0.5 * density * v.magnitude2() * COEFFICIENT * area * n;
+
             // Add forces to vertices
-            forces[i_1] += f_s + f_d;
-            forces[i_2] -= f_s + f_d;
+            if f_a.magnitude2().is_finite() {
+                forces[i_1] += f_a * 0.333;
+                forces[i_2] += f_a * 0.333;
+                forces[i_3] += f_a * 0.333;
+            }
         }
     }
 
@@ -324,25 +404,23 @@ impl SimulationModel {
                 vertex.velocity = [0.0; 3];
                 continue;
             } else {
-                vertex.velocity[0] += acceleration[0] * timestep.as_secs_f32();
-                vertex.velocity[1] += acceleration[1] * timestep.as_secs_f32();
-                vertex.velocity[2] += acceleration[2] * timestep.as_secs_f32();
+                if acceleration.magnitude2().is_finite() {
+                    vertex.velocity[0] += acceleration.x * timestep.as_secs_f32();
+                    vertex.velocity[1] += acceleration.y * timestep.as_secs_f32();
+                    vertex.velocity[2] += acceleration.z * timestep.as_secs_f32();
+                }
+
+                // Clip velocity magnitude to limit the amount of instability
+                if cgmath::Vector3::from(vertex.velocity).magnitude2() > 10000.0 {
+                    vertex.velocity =
+                        (cgmath::Vector3::from(vertex.velocity).normalize() * 10.0).into();
+                }
 
                 let velocity: cgmath::Vector3<f32> = vertex.velocity.into();
                 let new_position: cgmath::Point3<f32> = vertex.position.into();
                 let new_postion = new_position + velocity * timestep.as_secs_f32();
 
-                Self::ground_collistion(
-                    &self.mesh.settings,
-                    vertex,
-                    force,
-                    &new_postion,
-                    timestep,
-                );
-
-                //vertex.position[0] += vertex.velocity[0] * timestep.as_secs_f32();
-                //vertex.position[1] += vertex.velocity[1] * timestep.as_secs_f32();
-                //vertex.position[2] += vertex.velocity[2] * timestep.as_secs_f32();
+                Self::ground_collistion(&self.mesh.settings, vertex, force, &new_postion, timestep);
             }
         }
     }
@@ -370,7 +448,7 @@ impl SimulationModel {
             let f_s = (-f_n * settings.ground_friction_static).magnitude() * v_tan.normalize();
 
             let impulse: cgmath::Vector3<f32> = if v_tan.magnitude() < STATIC_FRICTION_THRESHOLD
-                && f_s.magnitude() / vertex.mass < v_tan.magnitude()
+                && f_s.magnitude2() / vertex.mass < v_tan.magnitude2()
             {
                 -v_tan
             } else {
@@ -380,9 +458,11 @@ impl SimulationModel {
                     / vertex.mass
             };
 
-            vertex.velocity[0] += impulse[0];
-            vertex.velocity[1] += impulse[1];
-            vertex.velocity[2] += impulse[2];
+            if impulse.magnitude2().is_finite() {
+                vertex.velocity[0] += impulse.x;
+                vertex.velocity[1] += impulse.y;
+                vertex.velocity[2] += impulse.z;
+            }
 
             // collision
             let penetration = _ground_level - new_position[1];
@@ -431,13 +511,7 @@ impl SimulationModel {
     ) -> Vec<cgmath::Vector3<f32>> {
         triangles
             .iter()
-            .map(|Triangle(v1, v2, v3)| {
-                let v1: cgmath::Point3<f32> = vertices[*v1 as usize].position.into();
-                let v2: cgmath::Point3<f32> = vertices[*v2 as usize].position.into();
-                let v3: cgmath::Point3<f32> = vertices[*v3 as usize].position.into();
-
-                (v2 - v1).cross(v3 - v1)
-            })
+            .map(|triangle| triangle.normal(vertices))
             .collect()
     }
 

@@ -1,6 +1,6 @@
 use cloth_simulation_lib::model;
 
-const GRAVITY_AMOUNT: f32 = -4.0;
+const GRAVITY_AMOUNT: f32 = -3.0;
 
 const VERTEX_COLOR: [f32; 3] = [0.6, 0.4, 0.2];
 const VERTEX_MASS: f32 = 0.01;
@@ -20,7 +20,8 @@ pub fn generate_cloth_mesh(height: u32, width: u32) -> model::Mesh {
     let name = format!("Cloth: {}x{}", height, width);
     let settings = model::SimulationSettings {
         gravity: [0.0, GRAVITY_AMOUNT, 0.0],
-        wind: [0.05, 0.0, 0.05],
+        wind: [0.2, 0.0, 0.05],
+        fluid_density: 1.2,
         ground_level: -1.0,
         ground_size: 2.0,
         ground_friction_static: 0.5,
@@ -31,10 +32,6 @@ pub fn generate_cloth_mesh(height: u32, width: u32) -> model::Mesh {
     let vertices = generate_vertices(height, width);
     let springs = generate_springs(height, width);
     let triangles = generate_triangles(height, width);
-
-    assert_eq!(vertices.len(), (height * width) as usize);
-    //assert_eq!(springs.len(), ((height - 1) * (width - 1) * 2) as usize);
-    assert_eq!(triangles.len(), ((height - 1) * (width - 1) * 2) as usize);
 
     model::Mesh {
         name,
