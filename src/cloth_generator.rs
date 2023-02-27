@@ -1,9 +1,9 @@
 use cloth_simulation_lib::model;
 
-const GRAVITY_AMOUNT: f32 = -3.0;
+const GRAVITY_AMOUNT: f32 = -9.81;
 
 const VERTEX_COLOR: [f32; 3] = [0.6, 0.4, 0.2];
-const VERTEX_MASS: f32 = 0.01;
+const VERTEX_BASE_MASS: f32 = 0.1;
 
 const SPRING_CONSTANT: f32 = 100.0;
 const SPRING_DAMPING: f32 = 0.5;
@@ -45,6 +45,8 @@ pub fn generate_cloth_mesh(height: u32, width: u32) -> model::Mesh {
 fn generate_vertices(height: u32, width: u32) -> Vec<model::Vertex> {
     let mut vertices = Vec::new();
 
+    let vertex_mass = VERTEX_BASE_MASS / width as f32;
+
     for row in 0..height {
         for col in 0..width {
             // Normalize position so the width is 1 and the position is
@@ -55,7 +57,7 @@ fn generate_vertices(height: u32, width: u32) -> Vec<model::Vertex> {
             let position = [normalized_x, normalized_z, 0.0];
             let color = VERTEX_COLOR;
             let normal = [0.0; 3]; // Will be calculated later
-            let mass = VERTEX_MASS;
+            let mass = vertex_mass;
             let fixed = if row == 0 { 1 } else { 0 };
             let velocity = [0.0; 3];
 
