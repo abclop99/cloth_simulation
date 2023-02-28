@@ -302,10 +302,26 @@ impl SimulationModel {
         }
     }
 
-    pub fn update(&mut self, timestep: Duration, queue: &wgpu::Queue) {
+    pub fn update(&mut self, timestep: Duration, queue: &wgpu::Queue, depth: i32) {
         if self.paused {
             return;
         }
+
+        // Recursively split timestep if too long
+        if timestep.as_secs_f32() > 0.016 && depth > 0 {
+            for _ in 0..2 {
+                self.update(timestep.mul_f32(0.5), queue, depth - 1);
+            }
+
+            return;
+        }
+
+        // If the duration is still too long, clamp it to 1/60th of a second
+        let timestep = if timestep.as_secs_f32() > 0.016 {
+            Duration::from_secs_f32(0.016)
+        } else {
+            timestep
+        };
 
         let mut forces: Vec<cgmath::Vector3<f32>> = vec![[0.0; 3].into(); self.mesh.vertices.len()];
 

@@ -223,8 +223,7 @@ impl State {
         //    .update_camera(&mut self.camera, timestep);
         self.camera.update(timestep, &self.queue);
 
-        self.model.update(timestep.mul_f32(0.5), &self.queue);
-        self.model.update(timestep.mul_f32(0.5), &self.queue);
+        self.model.update(timestep, &self.queue, 2);
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
