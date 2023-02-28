@@ -339,8 +339,6 @@ impl SimulationModel {
             &mut forces,
         );
 
-        //Self::limit_lengths(&self.mesh.springs, &self.mesh.vertices, &mut forces);
-
         self.integrate_forces(&forces, timestep);
 
         self.update_normals(queue);
@@ -459,60 +457,6 @@ impl SimulationModel {
             forces[i_1 as usize] += aerodynamic_force_per_vertex;
             forces[i_2 as usize] += aerodynamic_force_per_vertex;
             forces[i_3 as usize] += aerodynamic_force_per_vertex;
-        }
-    }
-
-    // Removes the forces if the spring is too long and the force is pulling the vertices apart
-    fn limit_lengths(
-        springs: &Vec<Spring>,
-        vertices: &Vec<Vertex>,
-        forces: &mut Vec<cgmath::Vector3<f32>>,
-    ) {
-        // Apply more dampening force if the spring is too long and moving apart and
-        // the force is pulling the vertices further apart
-        for spring in springs {
-            let i_1 = spring.vertices[0] as usize;
-            let i_2 = spring.vertices[1] as usize;
-
-            let r_1: cgmath::Point3<f32> = vertices[i_1].position.into();
-            let r_2: cgmath::Point3<f32> = vertices[i_2].position.into();
-
-            let e = (r_2 - r_1).normalize();
-
-            let l = r_1.distance(r_2);
-
-            if l < spring.rest_length * 1.5 {
-                continue;
-            }
-
-            // Damper
-            // F_d = -k_d * (v_close) * e
-            // v_close = (v1 - v2) * e
-            let v_1: cgmath::Vector3<f32> = vertices[i_1].velocity.into();
-            let v_2: cgmath::Vector3<f32> = vertices[i_2].velocity.into();
-            let v_close = (v_1 - v_2).dot(e);
-
-            if v_close >= 0.0 {
-                continue;
-            }
-
-            let f_1 = forces[i_1];
-            let f_2 = forces[i_2];
-            let f_close = (f_1 - f_2).dot(e);
-
-            if f_close >= 0.0 {
-                continue;
-            }
-
-            let f_d = -0.0 * v_close * e;
-
-            // Limit forces to finite values
-            // This is necessary because the simulation can get unstable
-            // and produce NaN values
-            if f_d.magnitude2().is_finite() {
-                forces[i_1] += f_d;
-                forces[i_2] -= f_d;
-            }
         }
     }
 
