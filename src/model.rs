@@ -144,9 +144,12 @@ impl SimulationModel {
         let vertex_normals: Vec<[f32; 3]> =
             Self::compute_vertex_normals(&mesh.vertices, &mesh.triangles, &triangle_normals);
 
-        for (vertex, normal) in mesh.vertices.iter_mut().zip(vertex_normals) {
-            vertex.normal = normal;
-        }
+        mesh.vertices
+            .par_iter_mut()
+            .zip(vertex_normals)
+            .for_each(|(vertex, normal)| {
+                vertex.normal = normal;
+            });
 
         // Create the vertex and index buffers
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -161,16 +164,16 @@ impl SimulationModel {
         });
 
         // Set spring rest lengths to initial distance between vertices
-        for spring in mesh.springs.iter_mut() {
+        mesh.springs.par_iter_mut().for_each(|spring| {
             let v1 = mesh.vertices[spring.vertices[0] as usize].position;
             let v2 = mesh.vertices[spring.vertices[1] as usize].position;
             spring.rest_length = cgmath::Vector3::from(v1).distance(cgmath::Vector3::from(v2));
-        }
+        });
 
         // Set initial velocities
-        for vertex in mesh.vertices.iter_mut() {
+        mesh.vertices.par_iter_mut().for_each(|vertex| {
             vertex.velocity = [0.0; 3];
-        }
+        });
 
         Self {
             mesh,
