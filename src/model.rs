@@ -415,8 +415,11 @@ impl SimulationModel {
         forces: &mut Vec<cgmath::Vector3<f32>>,
     ) {
         const COEFFICIENT: f32 = 1.28;
+        const ONE_THIRD: f32 = 1.0 / 3.0;
 
-        for triangle in triangles {
+        let (tx, rx) = channel::<(u16, u16, u16, cgmath::Vector3<f32>)>();
+
+        triangles.par_iter().for_each_with(tx, |tx, triangle| {
             let i_1 = triangle.0 as usize;
             let i_2 = triangle.1 as usize;
             let i_3 = triangle.2 as usize;
@@ -447,10 +450,15 @@ impl SimulationModel {
 
             // Add forces to vertices
             if f_a.magnitude2().is_finite() {
-                forces[i_1] += f_a * 0.333;
-                forces[i_2] += f_a * 0.333;
-                forces[i_3] += f_a * 0.333;
+                tx.send((i_1 as u16, i_2 as u16, i_3 as u16, f_a * ONE_THIRD))
+                    .unwrap();
             }
+        });
+
+        while let Ok((i_1, i_2, i_3, aerodynamic_force_per_vertex)) = rx.recv() {
+            forces[i_1 as usize] += aerodynamic_force_per_vertex;
+            forces[i_2 as usize] += aerodynamic_force_per_vertex;
+            forces[i_3 as usize] += aerodynamic_force_per_vertex;
         }
     }
 
