@@ -249,15 +249,13 @@ impl SimulationModel {
                     false
                 }
             }
-            WindowEvent::MouseInput { state, button, .. } => {
-                match button {
-                    MouseButton::Left => {
-                        self.left_mouse_pressed = *state == ElementState::Pressed;
-                        true
-                    }
-                    _ => false
+            WindowEvent::MouseInput { state, button, .. } => match button {
+                MouseButton::Left => {
+                    self.left_mouse_pressed = *state == ElementState::Pressed;
+                    true
                 }
-            }
+                _ => false,
+            },
             _ => false,
         }
     }
