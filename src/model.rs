@@ -347,10 +347,14 @@ impl SimulationModel {
         vertices: &Vec<Vertex>,
         gravity: [f32; 3],
     ) {
-        for (force, vertex) in forces.iter_mut().zip(vertices.iter()) {
-            let gravity: cgmath::Vector3<f32> = gravity.into();
-            *force += gravity * vertex.mass;
-        }
+        let gravity: cgmath::Vector3<f32> = gravity.into();
+
+        forces
+            .par_iter_mut()
+            .zip(vertices)
+            .for_each(|(force, vertex)| {
+                *force += gravity * vertex.mass;
+            });
     }
 
     fn apply_spring_damper_forces(
