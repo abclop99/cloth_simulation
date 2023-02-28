@@ -8,8 +8,7 @@ const VERTEX_BASE_MASS: f32 = 0.1;
 const SPRING_CONSTANT: f32 = 100.0;
 const SPRING_DAMPING: f32 = 0.5;
 
-const BENDING_SPRING_CONSTANT: f32 = 50.0;
-const BENDING_SPRING_DAMPING: f32 = 0.3;
+const BENDING_MULTIPLIER: f32 = 0.5;
 
 struct Position {
     row: u32,
@@ -30,7 +29,7 @@ pub fn generate_cloth_mesh(height: u32, width: u32) -> model::Mesh {
         ground_color: [0.1, 0.5, 0.05],
     };
     let vertices = generate_vertices(height, width);
-    let springs = generate_springs(height, width);
+    let springs = generate_springs(&vertices, height, width);
     let triangles = generate_triangles(height, width);
 
     model::Mesh {
@@ -75,7 +74,7 @@ fn generate_vertices(height: u32, width: u32) -> Vec<model::Vertex> {
     vertices
 }
 
-fn generate_springs(height: u32, width: u32) -> Vec<model::Spring> {
+fn generate_springs(vertices: &Vec<model::Vertex>, height: u32, width: u32) -> Vec<model::Spring> {
     let mut springs = Vec::new();
 
     // Generate springs for each square in the grid
@@ -123,8 +122,9 @@ fn generate_springs(height: u32, width: u32) -> Vec<model::Spring> {
             if col < width - 1 {
                 springs.push(model::Spring {
                     vertices: [top_left_index, top_right_index],
-                    k_s: SPRING_CONSTANT,
-                    k_d: SPRING_DAMPING,
+                    k_s: SPRING_CONSTANT
+                        * spring_length(&vertices, top_left_index, top_right_index),
+                    k_d: SPRING_DAMPING * spring_length(&vertices, top_left_index, top_right_index),
                     rest_length: 0.0, // Will be calculated later
                 });
 
@@ -132,8 +132,12 @@ fn generate_springs(height: u32, width: u32) -> Vec<model::Spring> {
                 if col < width - 2 {
                     springs.push(model::Spring {
                         vertices: [top_left_bend_index, top_right_bend_index],
-                        k_s: BENDING_SPRING_CONSTANT,
-                        k_d: BENDING_SPRING_DAMPING,
+                        k_s: SPRING_CONSTANT
+                            * BENDING_MULTIPLIER
+                            * spring_length(&vertices, top_left_bend_index, top_right_bend_index),
+                        k_d: SPRING_DAMPING
+                            * BENDING_MULTIPLIER
+                            * spring_length(&vertices, top_left_bend_index, top_right_bend_index),
                         rest_length: 0.0, // Will be calculated later
                     });
                 }
@@ -143,8 +147,10 @@ fn generate_springs(height: u32, width: u32) -> Vec<model::Spring> {
             if row < height - 1 {
                 springs.push(model::Spring {
                     vertices: [top_left_index, bottom_left_index],
-                    k_s: SPRING_CONSTANT,
-                    k_d: SPRING_DAMPING,
+                    k_s: SPRING_CONSTANT
+                        * spring_length(&vertices, top_left_index, bottom_left_index),
+                    k_d: SPRING_DAMPING
+                        * spring_length(&vertices, top_left_index, bottom_left_index),
                     rest_length: 0.0, // Will be calculated later
                 });
 
@@ -152,8 +158,12 @@ fn generate_springs(height: u32, width: u32) -> Vec<model::Spring> {
                 if row < height - 2 {
                     springs.push(model::Spring {
                         vertices: [top_left_bend_index, bottom_left_bend_index],
-                        k_s: BENDING_SPRING_CONSTANT,
-                        k_d: BENDING_SPRING_DAMPING,
+                        k_s: SPRING_CONSTANT
+                            * BENDING_MULTIPLIER
+                            * spring_length(&vertices, top_left_bend_index, bottom_left_bend_index),
+                        k_d: SPRING_DAMPING
+                            * BENDING_MULTIPLIER
+                            * spring_length(&vertices, top_left_bend_index, bottom_left_bend_index),
                         rest_length: 0.0, // Will be calculated later
                     });
                 }
@@ -163,14 +173,18 @@ fn generate_springs(height: u32, width: u32) -> Vec<model::Spring> {
             if col < width - 1 && row < height - 1 {
                 springs.push(model::Spring {
                     vertices: [top_left_index, bottom_right_index],
-                    k_s: SPRING_CONSTANT,
-                    k_d: SPRING_DAMPING,
+                    k_s: SPRING_CONSTANT
+                        * spring_length(&vertices, top_left_index, bottom_right_index),
+                    k_d: SPRING_DAMPING
+                        * spring_length(&vertices, top_left_index, bottom_right_index),
                     rest_length: 0.0, // Will be calculated later
                 });
                 springs.push(model::Spring {
                     vertices: [top_right_index, bottom_left_index],
-                    k_s: SPRING_CONSTANT,
-                    k_d: SPRING_DAMPING,
+                    k_s: SPRING_CONSTANT
+                        * spring_length(&vertices, top_right_index, bottom_left_index),
+                    k_d: SPRING_DAMPING
+                        * spring_length(&vertices, top_right_index, bottom_left_index),
                     rest_length: 0.0, // Will be calculated later
                 });
 
@@ -178,14 +192,38 @@ fn generate_springs(height: u32, width: u32) -> Vec<model::Spring> {
                 if col < width - 2 && row < height - 2 {
                     springs.push(model::Spring {
                         vertices: [top_left_bend_index, bottom_right_bend_index],
-                        k_s: BENDING_SPRING_CONSTANT,
-                        k_d: BENDING_SPRING_DAMPING,
+                        k_s: SPRING_CONSTANT
+                            * BENDING_MULTIPLIER
+                            * spring_length(
+                                &vertices,
+                                top_left_bend_index,
+                                bottom_right_bend_index,
+                            ),
+                        k_d: SPRING_DAMPING
+                            * BENDING_MULTIPLIER
+                            * spring_length(
+                                &vertices,
+                                top_left_bend_index,
+                                bottom_right_bend_index,
+                            ),
                         rest_length: 0.0, // Will be calculated later
                     });
                     springs.push(model::Spring {
                         vertices: [top_right_bend_index, bottom_left_bend_index],
-                        k_s: BENDING_SPRING_CONSTANT,
-                        k_d: BENDING_SPRING_DAMPING,
+                        k_s: SPRING_CONSTANT
+                            * BENDING_MULTIPLIER
+                            * spring_length(
+                                &vertices,
+                                top_right_bend_index,
+                                bottom_left_bend_index,
+                            ),
+                        k_d: SPRING_DAMPING
+                            * BENDING_MULTIPLIER
+                            * spring_length(
+                                &vertices,
+                                top_right_bend_index,
+                                bottom_left_bend_index,
+                            ),
                         rest_length: 0.0, // Will be calculated later
                     });
                 }
@@ -194,6 +232,17 @@ fn generate_springs(height: u32, width: u32) -> Vec<model::Spring> {
     }
 
     springs
+}
+
+fn spring_length(vertices: &[model::Vertex], vertex_1_index: u16, vertex_2_index: u16) -> f32 {
+    let vertex_1 = vertices[vertex_1_index as usize].position;
+    let vertex_2 = vertices[vertex_2_index as usize].position;
+
+    let x = vertex_1[0] - vertex_2[0];
+    let y = vertex_1[1] - vertex_2[1];
+    let z = vertex_1[2] - vertex_2[2];
+
+    (x * x + y * y + z * z).sqrt()
 }
 
 fn generate_triangles(height: u32, width: u32) -> Vec<model::Triangle> {
