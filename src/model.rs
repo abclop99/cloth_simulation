@@ -1,6 +1,7 @@
 use cgmath::prelude::*;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::sync::mpsc::channel;
 use std::time::Duration;
 use wgpu::util::DeviceExt;
 use winit::event::*;
@@ -365,7 +366,9 @@ impl SimulationModel {
         springs: &Vec<Spring>,
         forces: &mut Vec<cgmath::Vector3<f32>>,
     ) {
-        for spring in springs {
+        let (tx, rx) = channel::<(u16, u16, cgmath::Vector3<f32>)>();
+
+        springs.par_iter().for_each_with(tx, |tx, spring| {
             let i_1 = spring.vertices[0] as usize;
             let i_2 = spring.vertices[1] as usize;
 
@@ -395,9 +398,13 @@ impl SimulationModel {
             // This is necessary because the simulation can get unstable
             // and produce NaN values
             if f_s.magnitude2().is_finite() && f_d.magnitude2().is_finite() {
-                forces[i_1] += f_s + f_d;
-                forces[i_2] -= f_s + f_d;
+                tx.send((i_1 as u16, i_2 as u16, f_s + f_d)).unwrap();
             }
+        });
+
+        while let Ok((i_1, i_2, spring_force)) = rx.recv() {
+            forces[i_1 as usize] += spring_force;
+            forces[i_2 as usize] -= spring_force;
         }
     }
 
