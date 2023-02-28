@@ -1,4 +1,5 @@
 use cgmath::prelude::*;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use wgpu::util::DeviceExt;
@@ -495,38 +496,41 @@ impl SimulationModel {
 
     fn integrate_forces(&mut self, forces: &Vec<cgmath::Vector3<f32>>, timestep: Duration) {
         // Integrate forces
-        for (vertex, force) in self.mesh.vertices.iter_mut().zip(forces) {
-            let acceleration = *force / vertex.mass;
+        self.mesh
+            .vertices
+            .par_iter_mut()
+            .zip(forces)
+            .for_each(|(vertex, force)| {
+                let acceleration = *force / vertex.mass;
 
-            if vertex.fixed != 0 {
-                vertex.velocity = [0.0; 3];
-                continue;
-            } else {
-                if acceleration.magnitude2().is_finite() {
-                    vertex.velocity[0] += acceleration.x * timestep.as_secs_f32();
-                    vertex.velocity[1] += acceleration.y * timestep.as_secs_f32();
-                    vertex.velocity[2] += acceleration.z * timestep.as_secs_f32();
+                if vertex.fixed != 0 {
+                    vertex.velocity = [0.0; 3];
+                } else {
+                    if acceleration.magnitude2().is_finite() {
+                        vertex.velocity[0] += acceleration.x * timestep.as_secs_f32();
+                        vertex.velocity[1] += acceleration.y * timestep.as_secs_f32();
+                        vertex.velocity[2] += acceleration.z * timestep.as_secs_f32();
+                    }
+
+                    // Clip velocity magnitude to limit the amount of instability
+                    if cgmath::Vector3::from(vertex.velocity).magnitude2() > 10000.0 {
+                        vertex.velocity =
+                            (cgmath::Vector3::from(vertex.velocity).normalize() * 10.0).into();
+                    }
+
+                    let velocity: cgmath::Vector3<f32> = vertex.velocity.into();
+                    let new_position: cgmath::Point3<f32> = vertex.position.into();
+                    let new_postion = new_position + velocity * timestep.as_secs_f32();
+
+                    Self::integrate_with_ground_collision(
+                        &self.mesh.settings,
+                        vertex,
+                        force,
+                        &new_postion,
+                        timestep,
+                    );
                 }
-
-                // Clip velocity magnitude to limit the amount of instability
-                if cgmath::Vector3::from(vertex.velocity).magnitude2() > 10000.0 {
-                    vertex.velocity =
-                        (cgmath::Vector3::from(vertex.velocity).normalize() * 10.0).into();
-                }
-
-                let velocity: cgmath::Vector3<f32> = vertex.velocity.into();
-                let new_position: cgmath::Point3<f32> = vertex.position.into();
-                let new_postion = new_position + velocity * timestep.as_secs_f32();
-
-                Self::integrate_with_ground_collision(
-                    &self.mesh.settings,
-                    vertex,
-                    force,
-                    &new_postion,
-                    timestep,
-                );
-            }
-        }
+            });
     }
 
     fn integrate_with_ground_collision(
